@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Intel NPU OpenVINO 壓力測試教學</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17202a;
+      --muted: #5d6978;
+      --line: #d9e1ea;
+      --paper: #ffffff;
+      --wash: #f5f7fa;
+      --blue: #1267d8;
+      --green: #138a58;
+      --amber: #b45f06;
+      --violet: #6b4bd8;
+      --terminal: #0d1117;
+      --terminal-text: #e6edf3;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--wash);
+      font-family: "Segoe UI", "Microsoft JhengHei", Arial, sans-serif;
+      line-height: 1.65;
+    }
+
+    header {
+      background: #10233f;
+      color: #fff;
+      padding: 42px 24px 34px;
+    }
+
+    .wrap {
+      max-width: 1040px;
+      margin: 0 auto;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+      gap: 28px;
+      align-items: center;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(34px, 5vw, 56px);
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      margin: 0;
+      max-width: 760px;
+      color: #d8e5f6;
+      font-size: 19px;
+    }
+
+    .device-panel {
+      background: #fff;
+      border-radius: 8px;
+      padding: 18px;
+      color: var(--ink);
+      box-shadow: 0 16px 42px rgba(0, 0, 0, 0.22);
+    }
+
+    .device-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      font-weight: 700;
+    }
+
+    .meter-row {
+      display: grid;
+      grid-template-columns: 74px 1fr 48px;
+      gap: 10px;
+      align-items: center;
+      margin: 11px 0;
+      color: #253244;
+      font-size: 14px;
+    }
+
+    .meter {
+      height: 10px;
+      overflow: hidden;
+      background: #e8edf3;
+      border-radius: 999px;
+    }
+
+    .meter span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+    }
+
+    .cpu span { width: 8%; background: var(--blue); }
+    .mem span { width: 33%; background: var(--green); }
+    .npu span { width: 100%; background: var(--violet); }
+
+    main {
+      padding: 28px 24px 52px;
+    }
+
+    nav {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      margin-bottom: 22px;
+    }
+
+    nav strong {
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    nav a {
+      color: var(--blue);
+      text-decoration: none;
+      margin-right: 16px;
+      white-space: nowrap;
+    }
+
+    section {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 24px;
+      margin: 18px 0;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 26px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 24px 0 8px;
+      font-size: 19px;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 10px 0;
+    }
+
+    ul, ol {
+      padding-left: 1.35rem;
+    }
+
+    li {
+      margin: 8px 0;
+    }
+
+    .callout {
+      border-left: 4px solid var(--blue);
+      background: #eef5ff;
+      padding: 12px 14px;
+      margin: 16px 0;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .warning {
+      border-left-color: var(--amber);
+      background: #fff6e8;
+    }
+
+    .success {
+      border-left-color: var(--green);
+      background: #ebf8f2;
+    }
+
+    code {
+      font-family: Consolas, "Cascadia Mono", monospace;
+      font-size: 0.94em;
+    }
+
+    pre {
+      position: relative;
+      overflow-x: auto;
+      margin: 14px 0;
+      padding: 16px;
+      color: var(--terminal-text);
+      background: var(--terminal);
+      border-radius: 8px;
+      border: 1px solid #30363d;
+      line-height: 1.5;
+    }
+
+    pre code {
+      font-size: 14px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 2px 9px;
+      margin: 3px 5px 3px 0;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: #344257;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin: 18px 0;
+    }
+
+    .flow div {
+      min-height: 110px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+    }
+
+    .flow b {
+      display: block;
+      margin-bottom: 6px;
+      color: #10233f;
+    }
+
+    .checklist {
+      columns: 2;
+      column-gap: 34px;
+    }
+
+    .footer {
+      color: var(--muted);
+      text-align: center;
+      font-size: 14px;
+      padding-top: 18px;
+    }
+
+    @media (max-width: 820px) {
+      .hero-grid,
+      .flow {
+        grid-template-columns: 1fr;
+      }
+
+      .checklist {
+        columns: 1;
+      }
+
+      header {
+        padding-top: 30px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap hero-grid">
+      <div>
+        <h1>Intel NPU OpenVINO 壓力測試教學</h1>
+        <p class="lead">這份教學示範如何在 Windows 上安裝 OpenVINO、確認 Intel NPU 被偵測到，並用簡單的卷積模型讓 NPU 跑到高負載。適合想快速驗證 Intel AI Boost / NPU 是否正常工作的朋友。</p>
+      </div>
+      <div class="device-panel" aria-label="NPU performance preview">
+        <div class="device-title">
+          <span>工作管理員效能畫面</span>
+          <span class="tag">NPU 100%</span>
+        </div>
+        <div class="meter-row cpu"><span>CPU</span><div class="meter"><span></span></div><strong>3%</strong></div>
+        <div class="meter-row mem"><span>Memory</span><div class="meter"><span></span></div><strong>33%</strong></div>
+        <div class="meter-row npu"><span>NPU 0</span><div class="meter"><span></span></div><strong>100%</strong></div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap">
+      <nav>
+        <strong>快速目錄</strong>
+        <a href="#goal">目標</a>
+        <a href="#setup">環境準備</a>
+        <a href="#check">確認 NPU</a>
+        <a href="#model">建立模型</a>
+        <a href="#stress">壓力測試</a>
+        <a href="#tops">TOPS 換算</a>
+        <a href="#troubleshooting">排錯</a>
+      </nav>
+
+      <section id="goal">
+        <h2>1. 這份教學會做到什麼</h2>
+        <p>完成後，你會得到一個 OpenVINO IR 模型，並用 <code>benchmark_app</code> 指定 <code>-d NPU</code> 與 <code>-infer_precision NPU:i8</code> 執行 INT8 推論。成功時，Windows 工作管理員的 <strong>Performance &gt; NPU</strong> 會看到使用率上升，並可用 throughput 換算這個 workload 的 effective TOPS。</p>
+        <div class="flow">
+          <div><b>安裝</b>建立 Python 虛擬環境並安裝 OpenVINO。</div>
+          <div><b>確認</b>檢查 <code>CPU</code>、<code>GPU</code>、<code>NPU</code> 是否被列出。</div>
+          <div><b>產生</b>建立一個卷積模型給 NPU 跑。</div>
+          <div><b>壓力測試</b>用 INT8 precision 長時間推論並換算 TOPS。</div>
+        </div>
+      </section>
+
+      <section id="setup">
+        <h2>2. 環境準備</h2>
+        <p>請使用 Windows PowerShell，建議不要在 <code>C:\Windows\System32</code> 操作，先切到自己的工作資料夾。</p>
+        <pre><code>cd C:\Users\123\Documents\Codex\OPENVINO</code></pre>
+
+        <h3>建立 Python 虛擬環境</h3>
+        <pre><code>py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install openvino numpy</code></pre>
+
+        <div class="callout warning">
+          如果 PowerShell 不允許啟用虛擬環境，先執行：
+          <pre><code>Set-ExecutionPolicy -Scope CurrentUser RemoteSigned</code></pre>
+          然後重新執行 <code>.\.venv\Scripts\Activate.ps1</code>。
+        </div>
+      </section>
+
+      <section id="check">
+        <h2>3. 確認 OpenVINO 看得到 NPU</h2>
+        <p>最容易的檢查方式是用一行 Python 指令：</p>
+        <pre><code>python -c "import openvino as ov; print(ov.Core().available_devices)"</code></pre>
+        <p>如果輸出包含 <code>NPU</code>，例如：</p>
+        <pre><code>['CPU', 'GPU', 'NPU']</code></pre>
+        <div class="callout success">
+          看到 <code>NPU</code> 就代表 OpenVINO Runtime 已經偵測到 Intel NPU。接下來就可以指定 <code>-d NPU</code> 執行模型。
+        </div>
+
+        <h3>常見錯誤：把 Python 貼到 PowerShell</h3>
+        <p>以下是 Python 語法，不能直接貼在 PowerShell 的 <code>PS C:\...</code> 提示符號後面：</p>
+        <pre><code>import openvino as ov
+core = ov.Core()
+print(core.available_devices)</code></pre>
+        <p>正確做法是先輸入 <code>python</code> 進入 <code>&gt;&gt;&gt;</code> Python 互動模式，或使用上面的一行指令。</p>
+      </section>
+
+      <section id="model">
+        <h2>4. 建立 NPU 壓力測試模型</h2>
+        <p>建立一個名為 <code>make_npu_model.py</code> 的檔案，內容如下。這個模型本身用 FP16 權重儲存，但後續會用 <code>-infer_precision NPU:i8</code> 要求 NPU plugin 以 INT8 inference precision 編譯執行。</p>
+        <pre><code>import numpy as np
+import openvino as ov
+from openvino import opset11 as ops
+
+input_node = ops.parameter([1, 3, 224, 224], dtype=np.float16, name="input")
+
+x = input_node
+in_channels = 3
+
+for i in range(12):
+    out_channels = 64
+    weights = np.random.randn(out_channels, in_channels, 3, 3).astype(np.float16) * 0.02
+    const = ops.constant(weights)
+
+    x = ops.convolution(
+        x,
+        const,
+        strides=[1, 1],
+        pads_begin=[1, 1],
+        pads_end=[1, 1],
+        dilations=[1, 1],
+    )
+    x = ops.relu(x)
+    in_channels = out_channels
+
+model = ov.Model([x], [input_node], "npu_stress_conv")
+ov.save_model(model, "npu_stress.xml")
+
+print("Saved npu_stress.xml")</code></pre>
+
+        <p>執行：</p>
+        <pre><code>python make_npu_model.py</code></pre>
+        <p>成功後會產生：</p>
+        <ul>
+          <li><code>npu_stress.xml</code></li>
+          <li><code>npu_stress.bin</code></li>
+        </ul>
+      </section>
+
+      <section id="stress">
+        <h2>5. 開始用 INT8 壓力測試 NPU</h2>
+        <p>先跑 60 秒確認能正常執行。重點參數是 <code>-infer_precision NPU:i8</code>，這會要求 NPU 使用 INT8 inference precision：</p>
+        <pre><code>benchmark_app -m npu_stress.xml -d NPU -infer_precision NPU:i8 -hint throughput -t 60</code></pre>
+
+        <p>如果成功，再拉長到 5 分鐘：</p>
+        <pre><code>benchmark_app -m npu_stress.xml -d NPU -infer_precision NPU:i8 -hint throughput -t 300</code></pre>
+
+        <p>建議把結果同時存到文字檔，後面換算 effective TOPS 會比較方便：</p>
+        <pre><code>.\.venv\Scripts\benchmark_app.exe `
+  -m .\npu_stress.xml `
+  -d NPU `
+  -infer_precision NPU:i8 `
+  -hint throughput `
+  -t 300 `
+  | Tee-Object .\npu_int8_benchmark.txt</code></pre>
+
+        <h3>如何確認真的在跑 NPU</h3>
+        <ol>
+          <li>按 <code>Ctrl + Shift + Esc</code> 開啟工作管理員。</li>
+          <li>切到 <strong>Performance</strong>。</li>
+          <li>點選 <strong>NPU 0</strong> 或 <strong>Intel(R) AI Boost</strong>。</li>
+          <li>執行上面的 <code>benchmark_app</code> 指令。</li>
+          <li>觀察 NPU 使用率是否上升。</li>
+        </ol>
+
+        <div class="callout success">
+          看到輸出包含 <code>EXECUTION_DEVICES: NPU</code> 與 <code>INFERENCE_PRECISION_HINT: &lt;Type: 'int8_t'&gt;</code>，再搭配工作管理員 NPU 使用率上升，就代表 INT8 NPU 測試成功。
+        </div>
+      </section>
+
+      <section id="tops">
+        <h2>6. 如何換算 Effective TOPS</h2>
+        <p>工作管理員顯示 NPU 100% 只代表 NPU 很忙，不等於直接得到 13 TOPS。要估算這個 workload 的 effective TOPS，需要使用 <code>benchmark_app</code> 最後輸出的 <code>Throughput</code>。</p>
+
+        <h3>換算公式</h3>
+        <pre><code>Effective TOPS = 每次 inference operations × Throughput / 1,000,000,000,000</code></pre>
+
+        <p>這份教學產生的 <code>npu_stress.xml</code> 約為：</p>
+        <pre><code>20.43 GMAC / inference
+約 40.87 GOPS / inference</code></pre>
+
+        <p>所以可以簡化成：</p>
+        <pre><code>Effective TOPS ≈ Throughput × 0.04087</code></pre>
+
+        <h3>實際範例</h3>
+        <p>如果 <code>benchmark_app</code> 最後顯示：</p>
+        <pre><code>[ INFO ] Throughput: 122.28 FPS</code></pre>
+        <p>換算結果就是：</p>
+        <pre><code>Effective TOPS ≈ 122.28 × 0.04087
+               ≈ 5.00 TOPS</code></pre>
+
+        <div class="callout warning">
+          Intel 規格頁上的 <strong>13 TOPS</strong> 是 NPU 的 <strong>INT8 peak theoretical TOPS</strong>。這裡算出來的是這個 OpenVINO 模型在這台機器上的 effective TOPS，會受到模型結構、compiler、memory bandwidth、driver、runtime 設定與散熱狀態影響。
+        </div>
+
+        <h3>用 PowerShell 自動換算</h3>
+        <p>如果前面有用 <code>Tee-Object</code> 存成 <code>npu_int8_benchmark.txt</code>，可以直接執行：</p>
+        <pre><code>$line = Select-String .\npu_int8_benchmark.txt -Pattern "Throughput:\s+([0-9.]+)"
+$fps = [double]$line.Matches[0].Groups[1].Value
+"Estimated Effective TOPS = {0:N2}" -f ($fps * 0.04087)</code></pre>
+      </section>
+
+      <section id="troubleshooting">
+        <h2>7. 排錯指南</h2>
+        <ul class="checklist">
+          <li><strong>看不到 NPU：</strong>更新 Intel NPU driver，並確認裝置管理員內有 Intel AI Boost / NPU 裝置。</li>
+          <li><strong>PowerShell 出現 ParserError：</strong>你可能把 Python 程式碼直接貼到 PowerShell。請改用 <code>python -c</code> 或先進入 Python 互動模式。</li>
+          <li><strong>模型不能編譯：</strong>NPU 對模型算子和 shape 有限制，建議先用這份教學的 static shape 模型測試。</li>
+          <li><strong>沒有看到 INT8：</strong>檢查指令是否包含 <code>-infer_precision NPU:i8</code>，並在輸出中尋找 <code>INFERENCE_PRECISION_HINT</code>。</li>
+          <li><strong>NPU 使用率不高：</strong>模型可能太小或執行時間太短。可以把 <code>-t</code> 拉長，並確認使用 <code>-hint throughput</code>。</li>
+          <li><strong>benchmark_app 找不到：</strong>確認已啟用 <code>.venv</code>，並已安裝 <code>openvino</code>。</li>
+          <li><strong>想停止測試：</strong>在 PowerShell 按 <code>Ctrl + C</code>。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>8. 快速指令總整理</h2>
+        <pre><code>cd C:\Users\123\Documents\Codex\OPENVINO
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install openvino numpy
+python -c "import openvino as ov; print(ov.Core().available_devices)"
+python make_npu_model.py
+.\.venv\Scripts\benchmark_app.exe -m .\npu_stress.xml -d NPU -infer_precision NPU:i8 -hint throughput -t 300 | Tee-Object .\npu_int8_benchmark.txt
+$line = Select-String .\npu_int8_benchmark.txt -Pattern "Throughput:\s+([0-9.]+)"
+$fps = [double]$line.Matches[0].Groups[1].Value
+"Estimated Effective TOPS = {0:N2}" -f ($fps * 0.04087)</code></pre>
+      </section>
+
+      <p class="footer">分享給朋友時，只要把這個 HTML 檔和 <code>make_npu_model.py</code> 一起放在同一個資料夾即可。</p>
+    </div>
+  </main>
+</body>
+</html>
