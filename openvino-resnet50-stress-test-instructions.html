@@ -1,0 +1,655 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenVINO ResNet-50 壓力測試教學 - Windows 11 PowerShell</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18202a;
+      --muted: #5c6877;
+      --line: #d7e0ea;
+      --paper: #ffffff;
+      --wash: #f5f7fb;
+      --accent: #0b67c2;
+      --ok: #0f7b52;
+      --warn: #9a5b00;
+      --bad: #ad2f2f;
+      --terminal: #0d1117;
+      --terminalText: #e6edf3;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--wash);
+      color: var(--ink);
+      font-family: "Segoe UI", "Microsoft JhengHei", Arial, sans-serif;
+      line-height: 1.68;
+    }
+
+    header {
+      background: #17243b;
+      color: #fff;
+      padding: 40px 22px 30px;
+      border-bottom: 5px solid #37a2ff;
+    }
+
+    main, .wrap {
+      width: min(1060px, calc(100% - 36px));
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: 38px;
+      line-height: 1.14;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      margin: 0;
+      max-width: 860px;
+      color: #dbe8f8;
+      font-size: 18px;
+    }
+
+    section {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin: 22px 0;
+      padding: 22px;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 24px;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 22px 0 8px;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    p { margin: 8px 0 12px; }
+
+    ul, ol { padding-left: 24px; }
+
+    li { margin: 6px 0; }
+
+    code {
+      font-family: Consolas, "Cascadia Mono", "Courier New", monospace;
+      font-size: 0.95em;
+    }
+
+    pre {
+      position: relative;
+      margin: 12px 0 18px;
+      padding: 46px 16px 16px;
+      overflow-x: auto;
+      border-radius: 8px;
+      background: var(--terminal);
+      color: var(--terminalText);
+      font-family: Consolas, "Cascadia Mono", "Courier New", monospace;
+      font-size: 14px;
+      line-height: 1.55;
+      border: 1px solid #26303d;
+    }
+
+    .copy-code {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      min-width: 74px;
+      height: 28px;
+      border: 1px solid #3b4655;
+      border-radius: 6px;
+      background: #1f2937;
+      color: #f7fafc;
+      font-family: "Segoe UI", "Microsoft JhengHei", Arial, sans-serif;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .copy-code:hover {
+      background: #2d3748;
+    }
+
+    .copy-code:focus-visible {
+      outline: 3px solid #7cc4ff;
+      outline-offset: 2px;
+    }
+
+    .note, .warn, .check {
+      border-left: 5px solid var(--accent);
+      padding: 12px 14px;
+      background: #eef6ff;
+      border-radius: 6px;
+      margin: 12px 0;
+    }
+
+    .warn {
+      border-left-color: var(--warn);
+      background: #fff8e8;
+    }
+
+    .check {
+      border-left-color: var(--ok);
+      background: #edf9f4;
+    }
+
+    .bad {
+      color: var(--bad);
+      font-weight: 700;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 18px;
+      overflow: hidden;
+      border-radius: 8px;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #eaf1f8;
+    }
+
+    a { color: var(--accent); }
+
+    footer {
+      color: var(--muted);
+      padding: 18px 0 34px;
+      font-size: 14px;
+    }
+
+    @media (max-width: 680px) {
+      h1 { font-size: 30px; }
+      section { padding: 18px; }
+      main, .wrap { width: min(100% - 24px, 1060px); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>OpenVINO ResNet-50 壓力測試教學</h1>
+      <p class="lead">Windows 11 + PowerShell 版。流程採用固定 Python 虛擬環境、固定 OpenVINO 版本、官方 OpenVINO IR ResNet-50 模型，目標是把環境變數與套件版本問題降到最低。</p>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>0. 正式操作前：先確認可信套件與版本</h2>
+      <div class="warn">
+        <strong>請先做這段，不要直接跳到壓測。</strong>OpenVINO、Python、NPU/GPU 驅動版本不一致時，常見症狀是找不到 <code>benchmark_app</code>、找不到 <code>NPU</code>/<code>GPU</code> 裝置、或模型編譯失敗。
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>建議版本 / 來源</th>
+            <th>為什麼</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Windows</td>
+            <td>Windows 11 64-bit，建議更新到最新正式版</td>
+            <td>避免舊版驅動模型與 NPU/GPU runtime 不相容。</td>
+          </tr>
+          <tr>
+            <td>Python</td>
+            <td>本教學固定使用 Python 3.12 x64，從 Python.org 或 <code>winget</code> 安裝，不建議 Microsoft Store 版</td>
+            <td>Python 3.12 不是最新版本；這裡選它是為了穩定與可重現。Store 版 Python 常造成 PATH、權限與虛擬環境問題。</td>
+          </tr>
+          <tr>
+            <td>OpenVINO</td>
+            <td><code>openvino==2026.1.0</code></td>
+            <td>固定版本可重現；官方文件目前列出 OpenVINO 2026.1。</td>
+          </tr>
+          <tr>
+            <td>模型</td>
+            <td><code>OpenVINO/resnet50-int8-ov</code></td>
+            <td>OpenVINO 官方 Hugging Face 模型，已是 IR 格式，避免 TensorFlow/PyTorch 轉換地雷。</td>
+          </tr>
+          <tr>
+            <td>驅動</td>
+            <td>Intel Graphics Driver / Intel NPU Driver 使用 Intel 官方或 OEM 最新正式版</td>
+            <td>OpenVINO 能否看到 <code>GPU</code> 或 <code>NPU</code> 主要取決於驅動。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>1. 建立乾淨工作資料夾</h2>
+      <p>以下指令都在 PowerShell 執行。建議使用全新資料夾，避免污染你原本的 Python 環境。</p>
+      <pre><code>$ErrorActionPreference = "Stop"
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+
+$WorkDir = "$env:USERPROFILE\Documents\openvino-resnet50-stress"
+New-Item -ItemType Directory -Force -Path $WorkDir | Out-Null
+Set-Location $WorkDir
+
+Write-Host "Working directory: $PWD"</code></pre>
+    </section>
+
+    <section>
+      <h2>2. 安裝與確認 Python 3.12 x64</h2>
+      <p>Python 3.12 不是最新版本。本教學建議固定使用 Python 3.12 x64，是為了讓 OpenVINO、pip wheel、venv 與 Windows PowerShell 流程更穩定、可重現。如果你想使用更新的 Python，請先確認 OpenVINO 與相關套件已支援該版本。</p>
+      <p>如果你已經有 Python 3.12 x64，可以先跑確認指令。沒有的話，先用 <code>winget</code> 安裝。</p>
+      <h3>2.1 安裝本教學指定版本：Python 3.12 x64</h3>
+      <pre><code>winget install --id Python.Python.3.12 --source winget --accept-package-agreements --accept-source-agreements</code></pre>
+      <h3>2.2 關掉 PowerShell 後重新開啟，再確認版本</h3>
+      <pre><code>py -0p
+py -3.12 -c "import platform, sys; print(sys.version); print(platform.architecture())"</code></pre>
+      <div class="check">
+        你要看到 Python 3.12，且架構是 64-bit。若 <code>py -3.12</code> 找不到，重新開 PowerShell；仍找不到再重開機。
+      </div>
+    </section>
+
+    <section>
+      <h2>3. 建立並啟用虛擬環境</h2>
+      <p>這段會把所有 Python 套件鎖在 <code>.venv</code>，不要用系統全域 pip。</p>
+      <pre><code>$ErrorActionPreference = "Stop"
+Set-Location "$env:USERPROFILE\Documents\openvino-resnet50-stress"
+
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+python -m pip install --upgrade pip setuptools wheel
+python -m pip --version
+python --version</code></pre>
+      <div class="warn">
+        若 PowerShell 擋住啟用腳本，請在同一個視窗先跑：<code>Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force</code>。不要改全系統 ExecutionPolicy。
+      </div>
+    </section>
+
+    <section>
+      <h2>4. 安裝 OpenVINO 與下載工具</h2>
+      <p>這裡固定 OpenVINO 版本。模型下載改用 PowerShell 直接抓 <code>.xml</code> 與 <code>.bin</code>，減少額外 Python CLI 依賴。</p>
+      <pre><code>python -m pip install "openvino==2026.1.0"
+
+python -c "import openvino as ov; print('OpenVINO:', ov.__version__)"
+benchmark_app -h | Select-Object -First 20</code></pre>
+      <div class="check">
+        官方文件說明，透過 PyPI 安裝 OpenVINO 後會自動提供 Python 版 <code>benchmark_app</code>。如果這裡找不到，通常代表虛擬環境沒有啟用。
+      </div>
+    </section>
+
+    <section>
+      <h2>5. 下載 ResNet-50 OpenVINO IR 模型</h2>
+      <p>使用 OpenVINO 官方 Hugging Face 模型 <code>OpenVINO/resnet50-int8-ov</code>。它包含 <code>resnet50.xml</code> 與 <code>resnet50.bin</code>。</p>
+      <pre><code>$ModelDir = "$PWD\models\resnet50-int8-ov"
+New-Item -ItemType Directory -Force -Path $ModelDir | Out-Null
+
+$XmlUrl = "https://huggingface.co/OpenVINO/resnet50-int8-ov/resolve/main/resnet50.xml?download=true"
+$BinUrl = "https://huggingface.co/OpenVINO/resnet50-int8-ov/resolve/main/resnet50.bin?download=true"
+
+Invoke-WebRequest -Uri $XmlUrl -OutFile "$ModelDir\resnet50.xml"
+Invoke-WebRequest -Uri $BinUrl -OutFile "$ModelDir\resnet50.bin"
+
+Get-ChildItem $ModelDir
+$ModelXml = Join-Path $ModelDir "resnet50.xml"
+Test-Path $ModelXml</code></pre>
+      <p>如果公司網路擋 Hugging Face，改用瀏覽器打開模型頁下載 <code>resnet50.xml</code> 和 <code>resnet50.bin</code>，放進同一個 <code>$ModelDir</code>。</p>
+    </section>
+
+    <section>
+      <h2>6. 確認 OpenVINO 可用裝置</h2>
+      <p>壓測前先列出 OpenVINO 看得到的裝置。常見結果是 <code>CPU</code>、<code>GPU</code>、<code>NPU</code>，依你的硬體與驅動而定。</p>
+      <pre><code>@'
+import openvino as ov
+
+core = ov.Core()
+print("OpenVINO:", ov.__version__)
+print("Available devices:", core.available_devices)
+for device in core.available_devices:
+    try:
+        name = core.get_property(device, "FULL_DEVICE_NAME")
+    except Exception as exc:
+        name = f"Cannot query name: {exc}"
+    print(f"{device}: {name}")
+'@ | python -</code></pre>
+      <div class="warn">
+        如果沒有看到 <code>NPU</code>，先不要怪 Python。請先更新 Intel NPU Driver / Intel Graphics Driver，並重開機後再跑一次。沒有 NPU 硬體的機器當然也不會列出 <code>NPU</code>。
+      </div>
+    </section>
+
+    <section>
+      <h2>7. 先跑 60 秒基準測試</h2>
+      <p>先用 CPU 跑通，確認模型與 OpenVINO 安裝沒問題。壓測前一定要做這個 smoke test。</p>
+      <pre><code>$ModelXml = "$PWD\models\resnet50-int8-ov\resnet50.xml"
+benchmark_app -m $ModelXml -d CPU -t 60 -api async -hint throughput</code></pre>
+      <p>如果有 GPU：</p>
+      <pre><code>benchmark_app -m $ModelXml -d GPU -t 60 -api async -hint throughput</code></pre>
+      <p>如果有 NPU：</p>
+      <pre><code>benchmark_app -m $ModelXml -d NPU -t 60 -api async -hint throughput</code></pre>
+      <div class="note">
+        <code>benchmark_app</code> 預設會用隨機輸入資料測效能，輸出會包含 latency 與 throughput。ResNet-50 是 image classification 模型，這裡重點是硬體推論壓力，不是驗證分類準確率。
+      </div>
+    </section>
+
+    <section>
+      <h2>8. 壓力測試：單裝置長時間跑</h2>
+      <p>這是最穩的壓測方式。先從 CPU 或 GPU 開始，NPU 則視硬體與驅動支援狀況執行。</p>
+      <pre><code>$Device = "CPU"     # 可改成 "GPU" 或 "NPU"
+$Seconds = 600     # 10 分鐘；想跑 1 小時改 3600
+$LogDir = "$PWD\logs"
+$ModelXml = "$PWD\models\resnet50-int8-ov\resnet50.xml"
+
+New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+
+benchmark_app -m $ModelXml -d $Device -t $Seconds -api async -hint throughput *>&1 |
+  Tee-Object -FilePath "$LogDir\benchmark_${Device}_${Seconds}s.log"</code></pre>
+      <p>壓測期間建議同時開工作管理員，觀察 CPU、GPU、NPU、記憶體與溫度。如果你有 HWiNFO、Intel Arc Control 或 OEM 工具，也可以同步記錄功耗與溫度。</p>
+    </section>
+
+    <section>
+      <h2>9. 壓力測試：多工作並行</h2>
+      <p>這段會開多個 PowerShell background jobs 同時跑 <code>benchmark_app</code>。CPU/GPU 可以逐步加 worker；NPU 建議先從 1 個 worker 開始。</p>
+      <pre><code>$Device = "CPU"     # 可改成 "GPU"；NPU 建議先用 1 worker
+$Workers = 4
+$Seconds = 300
+$Root = "$PWD"
+$ModelXml = "$PWD\models\resnet50-int8-ov\resnet50.xml"
+$LogDir = "$PWD\logs"
+
+New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+Get-Job | Remove-Job -Force
+
+1..$Workers | ForEach-Object {
+  $Index = $_
+  Start-Job -Name "ov-$Device-$Index" -ScriptBlock {
+    param($Root, $ModelXml, $Device, $Seconds, $Index)
+    Set-Location $Root
+    .\.venv\Scripts\Activate.ps1
+    benchmark_app -m $ModelXml -d $Device -t $Seconds -api async -hint throughput *>&1 |
+      Tee-Object -FilePath ".\logs\benchmark_${Device}_worker${Index}_${Seconds}s.log"
+  } -ArgumentList $Root, $ModelXml, $Device, $Seconds, $Index
+}
+
+Get-Job
+Get-Job | Wait-Job
+Get-Job | Receive-Job
+Get-Job | Remove-Job</code></pre>
+      <div class="warn">
+        如果多 worker 讓系統卡住，請降低 <code>$Workers</code>。若 NPU 編譯或執行失敗，先用 <code>$Workers = 1</code>，再試 <code>AUTO:NPU,CPU</code>。
+      </div>
+    </section>
+
+    <section>
+      <h2>10. 失敗時的穩定排除順序</h2>
+      <ol>
+        <li>確認目前 PowerShell 有啟用 <code>.venv</code>：提示字元前面應有 <code>(.venv)</code>。</li>
+        <li>確認 <code>python -c "import openvino as ov; print(ov.__version__)"</code> 顯示 <code>2026.1.0</code>。</li>
+        <li>確認 <code>benchmark_app -h</code> 能顯示說明。</li>
+        <li>確認 <code>Test-Path .\models\resnet50-int8-ov\resnet50.xml</code> 是 <code>True</code>。</li>
+        <li>確認 <code>core.available_devices</code> 有你要測的裝置。</li>
+        <li>如果 <code>NPU</code> 不存在，更新 Intel NPU Driver 與 Intel Graphics Driver，重開機後再測。</li>
+        <li>如果只有 <code>GPU</code>/<code>NPU</code> 失敗，先用 <code>CPU</code> 跑通，確認不是模型或 Python 問題。</li>
+      </ol>
+      <pre><code># 一次跑完最常用的自我檢查
+.\.venv\Scripts\Activate.ps1
+python --version
+python -m pip --version
+python -c "import openvino as ov; print(ov.__version__)"
+benchmark_app -h | Select-Object -First 5
+Test-Path ".\models\resnet50-int8-ov\resnet50.xml"
+@'
+import openvino as ov
+core = ov.Core()
+print(core.available_devices)
+'@ | python -</code></pre>
+    </section>
+
+    <section>
+      <h2>11. 建議測試矩陣</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>階段</th>
+            <th>裝置</th>
+            <th>時間</th>
+            <th>Worker</th>
+            <th>目的</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Smoke test</td>
+            <td>CPU</td>
+            <td>60 秒</td>
+            <td>1</td>
+            <td>確認 OpenVINO、模型、benchmark_app 正常。</td>
+          </tr>
+          <tr>
+            <td>單裝置基準</td>
+            <td>CPU / GPU / NPU</td>
+            <td>300 秒</td>
+            <td>1</td>
+            <td>取得各裝置 baseline throughput 與 latency。</td>
+          </tr>
+          <tr>
+            <td>長時間穩定性</td>
+            <td>目標裝置</td>
+            <td>3600 秒</td>
+            <td>1</td>
+            <td>觀察溫度、降頻、driver reset、記憶體成長。</td>
+          </tr>
+          <tr>
+            <td>多工作壓力</td>
+            <td>CPU / GPU</td>
+            <td>300-1800 秒</td>
+            <td>2、4、8 逐步增加</td>
+            <td>測系統吞吐、排程與穩定性。</td>
+          </tr>
+          <tr>
+            <td>NPU 保守壓測</td>
+            <td>NPU</td>
+            <td>300-1800 秒</td>
+            <td>1 起跳</td>
+            <td>NPU 對模型與驅動較敏感，先確認單工作穩定。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>12. 將壓測結果換算成 TOPS，並與 Intel 官網規格比較</h2>
+      <div class="warn">
+        Intel 官網常見的 <code>NPU 峰值 TOPS (Int8)</code> 是硬體在理想條件下的理論峰值。<code>benchmark_app</code> 測到的是模型在 OpenVINO runtime、driver、模型圖、memory access、排程與裝置支援限制下的實際吞吐量。兩者用途不同，請用「有效 TOPS / 峰值 TOPS」看利用率，不要期待實測等於官網峰值。
+      </div>
+
+      <h3>12.1 最簡單的算法</h3>
+      <p>先從 <code>benchmark_app</code> log 找到 throughput，也就是每秒推論次數 FPS：</p>
+      <pre><code>Throughput: 123.45 FPS</code></pre>
+      <p>然後只要套兩個公式：</p>
+      <pre><code>Effective TOPS = FPS × Model GOPS per inference ÷ 1000
+Peak utilization (%) = Effective TOPS ÷ Peak TOPS from vendor website × 100</code></pre>
+      <p><code>Peak TOPS</code> 是 Intel 官網或 OEM 規格頁上的 NPU 峰值。<code>Effective TOPS</code> 是這次壓測跑出來的模型有效吞吐。兩個數字相除，才是這個 workload 對理論峰值的利用率。</p>
+
+      <h3>12.2 ResNet-50 建議直接用 8.2 GOPS</h3>
+      <p>ResNet-50 常見估算約為 <code>4.1 GMAC</code>。為了跟硬體 <code>TOPS</code> 規格比較，通常把 1 個 MAC 視為 multiply + accumulate 兩個 operation，所以教學中直接使用：</p>
+      <pre><code>ResNet-50 Model GOPS per inference = 8.2</code></pre>
+      <table>
+        <thead>
+          <tr>
+            <th>模型</th>
+            <th>建議 GOPS per inference</th>
+            <th>用途</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ResNet-50</td>
+            <td><code>8.2 GOPS</code></td>
+            <td>適合把 <code>benchmark_app</code> 的 FPS 快速換算成 Effective TOPS。</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>如果你換成其他模型，請把 <code>$ModelGopsPerInference</code> 改成該模型對應的 GOPS。沒有可靠數字時，不要硬算 TOPS；先只比較 FPS、latency、功耗與穩定性。</p>
+
+      <h3>12.3 PowerShell 自動換算</h3>
+      <p>請把 <code>$PeakTopsFromSpec</code> 改成測試機器在 Intel 官網或 OEM 規格頁看到的 NPU 峰值 TOPS。不同 CPU / NPU 世代數字會不同，所以不要固定使用範例值。</p>
+      <pre><code>$LogFile = ".\logs\benchmark_NPU_600s.log"
+$PeakTopsFromSpec = 13.0       # 範例值：請改成你的機器規格
+$ModelGopsPerInference = 8.2   # ResNet-50 TOPS 比較口徑
+
+$Text = Get-Content $LogFile -Raw
+$Match = [regex]::Match($Text, "Throughput:\s+([0-9.]+)\s+FPS")
+if (-not $Match.Success) {
+  throw "找不到 Throughput: xxx FPS。請確認 log 檔是 benchmark_app 的輸出。"
+}
+
+$Fps = [double]$Match.Groups[1].Value
+$EffectiveTops = $Fps * $ModelGopsPerInference / 1000.0
+$PeakUtilization = $EffectiveTops / $PeakTopsFromSpec * 100.0
+
+[pscustomobject]@{
+  LogFile = $LogFile
+  FPS = [math]::Round($Fps, 2)
+  Model_GOPS_Per_Inference = $ModelGopsPerInference
+  Effective_TOPS = [math]::Round($EffectiveTops, 3)
+  Peak_TOPS_From_Spec = $PeakTopsFromSpec
+  Peak_Utilization_Percent = [math]::Round($PeakUtilization, 2)
+} | Format-List</code></pre>
+
+      <h3>12.4 手算範例</h3>
+      <p>假設 ResNet-50 壓測 log 顯示 <code>Throughput: 500 FPS</code>，而這台機器官網 NPU 峰值是 <code>13 TOPS</code>：</p>
+      <pre><code>Effective TOPS = 500 × 8.2 ÷ 1000 = 4.10 TOPS
+Peak utilization = 4.10 ÷ 13 × 100 = 31.54%</code></pre>
+      <p>如果另一台機器官網 NPU 峰值是 <code>40 TOPS</code>，同樣 <code>500 FPS</code> 的利用率會變成：</p>
+      <pre><code>Peak utilization = 4.10 ÷ 40 × 100 = 10.25%</code></pre>
+
+      <h3>12.5 解讀結果時要注意</h3>
+      <ul>
+        <li><code>Peak TOPS</code> 是 NPU 的理論 INT8 峰值，不是任何模型都會達到的 benchmark 分數。</li>
+        <li>ResNet-50 是否完整跑在 NPU、是否有 fallback、是否受 memory bandwidth 限制，都會影響有效 TOPS。</li>
+        <li>如果 <code>benchmark_app</code> log 顯示裝置不是 <code>NPU</code>，或你使用 <code>AUTO:NPU,CPU</code>，結果就不能直接視為純 NPU TOPS。</li>
+        <li>不同 batch、stream、driver、電源模式、散熱狀態都會改變 FPS；比較前請固定測試條件。</li>
+        <li>若要更接近官網峰值，需要使用能高度貼合 NPU INT8 execution path 的模型與 workload；ResNet-50 是實務壓測參考，不是硬體峰值測試。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>13. 適合 NPU INT8 壓測的模型與 workload</h2>
+      <p>想讓結果更貼近 NPU 的 INT8 execution path，請優先挑選已量化、靜態 shape、運算主體規則的模型。OpenVINO NPU 文件也提醒，NPU 支援量化模型可為 INT8 或 FP16-INT8，且目前 NPU 對 static shape 最友善。</p>
+      <h3>13.1 優先選擇</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>類型</th>
+            <th>候選模型</th>
+            <th>原因</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Image Classification CNN</td>
+            <td><code>resnet-50</code>, <code>mobilenet-v2</code>, <code>mobilenet-v3</code>, <code>efficientnet-b0</code>, <code>googlenet-v4</code></td>
+            <td>Conv-heavy、static input 容易固定，適合吞吐壓測與 TOPS 換算。</td>
+          </tr>
+          <tr>
+            <td>小型 Object Detection / OCR backbone</td>
+            <td><code>ssdlite_mobilenet_v2</code>, <code>pp-ocr-det</code>, <code>pp-ocr-rec</code></td>
+            <td>實務用途明確，但要注意 NMS、decode、後處理可能拉低有效 TOPS。</td>
+          </tr>
+          <tr>
+            <td>Audio / Speech 小模型</td>
+            <td><code>aclnet-int8</code>, DNS / keyword spotting 類模型</td>
+            <td>模型較小、輸入規則，適合檢查 NPU 穩定性與低功耗推論。</td>
+          </tr>
+          <tr>
+            <td>NLP encoder</td>
+            <td>BERT 類 <code>INT8</code> 或 <code>FP16-INT8</code> encoder</td>
+            <td>MatMul-heavy，可測另一種 workload；但 TOPS 換算通常沒有 ResNet-50 直覺。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>13.2 選模型的檢查清單</h3>
+      <ul>
+        <li>優先選 <code>INT8</code> 或 <code>FP16-INT8</code> 模型。</li>
+        <li>優先選固定輸入大小，例如 <code>1x3x224x224</code>。</li>
+        <li>優先選 OpenVINO IR 格式，也就是同時有 <code>.xml</code> 與 <code>.bin</code>。</li>
+        <li>用 <code>-d NPU</code> 單獨測，避免 <code>AUTO:NPU,CPU</code> 混入 fallback。</li>
+        <li>盡量把 resize、decode、NMS、tokenizer、postprocess 排除在 TOPS 換算之外。</li>
+      </ul>
+
+      <h3>13.3 不建議直接拿來比 Peak TOPS</h3>
+      <ul>
+        <li>LLM token generation：瓶頸常在 memory、KV cache、token loop，不是單純 INT8 dense compute。</li>
+        <li>完整 YOLO pipeline：NMS、decode、resize 與 postprocess 會讓有效 TOPS 變低。</li>
+        <li>dynamic shape 模型：NPU 路徑更容易受限制或編譯失敗。</li>
+        <li>FP16-only 模型：可以測 NPU，但不適合直接對比官網 <code>Int8 TOPS</code>。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>14. 參考來源</h2>
+      <ul>
+        <li><a href="https://docs.openvino.ai/install">OpenVINO 官方安裝文件</a></li>
+        <li><a href="https://docs.openvino.ai/nightly/get-started/learn-openvino/openvino-samples/benchmark-tool.html">OpenVINO Benchmark Tool 官方文件</a></li>
+        <li><a href="https://docs.openvino.ai/2026/about-openvino/performance-benchmarks/getting-performance-numbers.html">OpenVINO Performance Benchmark 官方文件</a></li>
+        <li><a href="https://huggingface.co/OpenVINO/resnet50-int8-ov">OpenVINO/resnet50-int8-ov 模型頁</a></li>
+      </ul>
+      <p>文件整理日期：2026-05-29。若未來 OpenVINO 或 Hugging Face CLI 有 breaking change，優先以官方文件最新版本為準。</p>
+    </section>
+
+    <footer>
+      <p>建議保存壓測 log：<code>logs\benchmark_*.log</code>。比較不同裝置時，請記錄驅動版本、OpenVINO 版本、電源模式、散熱狀態與測試秒數。</p>
+    </footer>
+  </main>
+  <script>
+    document.querySelectorAll("pre > code").forEach((codeBlock) => {
+      const pre = codeBlock.parentElement;
+      const button = document.createElement("button");
+      button.className = "copy-code";
+      button.type = "button";
+      button.textContent = "Copy";
+      button.setAttribute("aria-label", "Copy code block");
+
+      button.addEventListener("click", async () => {
+        const text = codeBlock.innerText;
+        try {
+          await navigator.clipboard.writeText(text);
+          button.textContent = "Copied";
+          window.setTimeout(() => {
+            button.textContent = "Copy";
+          }, 1600);
+        } catch (error) {
+          const textArea = document.createElement("textarea");
+          textArea.value = text;
+          textArea.setAttribute("readonly", "");
+          textArea.style.position = "fixed";
+          textArea.style.left = "-9999px";
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand("copy");
+          document.body.removeChild(textArea);
+          button.textContent = "Copied";
+          window.setTimeout(() => {
+            button.textContent = "Copy";
+          }, 1600);
+        }
+      });
+
+      pre.appendChild(button);
+    });
+  </script>
+</body>
+</html>
