@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenVINO ResNet-50 Stress Test Guide - Windows 11 PowerShell</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18202a;
+      --muted: #5c6877;
+      --line: #d7e0ea;
+      --paper: #ffffff;
+      --wash: #f5f7fb;
+      --accent: #0b67c2;
+      --ok: #0f7b52;
+      --warn: #9a5b00;
+      --bad: #ad2f2f;
+      --terminal: #0d1117;
+      --terminalText: #e6edf3;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--wash);
+      color: var(--ink);
+      font-family: "Segoe UI", Arial, sans-serif;
+      line-height: 1.68;
+    }
+
+    header {
+      background: #17243b;
+      color: #fff;
+      padding: 40px 22px 30px;
+      border-bottom: 5px solid #37a2ff;
+    }
+
+    main, .wrap {
+      width: min(1060px, calc(100% - 36px));
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: 38px;
+      line-height: 1.14;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      margin: 0;
+      max-width: 860px;
+      color: #dbe8f8;
+      font-size: 18px;
+    }
+
+    section {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin: 22px 0;
+      padding: 22px;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 24px;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 22px 0 8px;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    p { margin: 8px 0 12px; }
+
+    ul, ol { padding-left: 24px; }
+
+    li { margin: 6px 0; }
+
+    code {
+      font-family: Consolas, "Cascadia Mono", "Courier New", monospace;
+      font-size: 0.95em;
+    }
+
+    pre {
+      position: relative;
+      margin: 12px 0 18px;
+      padding: 46px 16px 16px;
+      overflow-x: auto;
+      border-radius: 8px;
+      background: var(--terminal);
+      color: var(--terminalText);
+      font-family: Consolas, "Cascadia Mono", "Courier New", monospace;
+      font-size: 14px;
+      line-height: 1.55;
+      border: 1px solid #26303d;
+    }
+
+    .copy-code {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      min-width: 74px;
+      height: 28px;
+      border: 1px solid #3b4655;
+      border-radius: 6px;
+      background: #1f2937;
+      color: #f7fafc;
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .copy-code:hover {
+      background: #2d3748;
+    }
+
+    .copy-code:focus-visible {
+      outline: 3px solid #7cc4ff;
+      outline-offset: 2px;
+    }
+
+    .note, .warn, .check {
+      border-left: 5px solid var(--accent);
+      padding: 12px 14px;
+      background: #eef6ff;
+      border-radius: 6px;
+      margin: 12px 0;
+    }
+
+    .warn {
+      border-left-color: var(--warn);
+      background: #fff8e8;
+    }
+
+    .check {
+      border-left-color: var(--ok);
+      background: #edf9f4;
+    }
+
+    .bad {
+      color: var(--bad);
+      font-weight: 700;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 18px;
+      overflow: hidden;
+      border-radius: 8px;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #eaf1f8;
+    }
+
+    a { color: var(--accent); }
+
+    footer {
+      color: var(--muted);
+      padding: 18px 0 34px;
+      font-size: 14px;
+    }
+
+    @media (max-width: 680px) {
+      h1 { font-size: 30px; }
+      section { padding: 18px; }
+      main, .wrap { width: min(100% - 24px, 1060px); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>OpenVINO ResNet-50 Stress Test Guide</h1>
+      <p class="lead">Windows 11 + PowerShell workflow. This guide uses a fixed Python virtual environment, a pinned OpenVINO version, and the official OpenVINO IR ResNet-50 model to reduce environment-variable and package-version problems.</p>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>0. Before You Start: Confirm Trusted Packages and Versions</h2>
+      <div class="warn">
+        <strong>Run this preparation first. Do not jump directly to the stress test.</strong> When OpenVINO, Python, NPU/GPU drivers, or runtime versions do not match, common symptoms include missing <code>benchmark_app</code>, missing <code>NPU</code>/<code>GPU</code> devices, or model compilation failures.
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Recommended Version / Source</th>
+            <th>Reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Windows</td>
+            <td>Windows 11 64-bit, preferably updated to the latest stable release</td>
+            <td>Avoid old driver/runtime combinations that may not work with NPU or GPU plugins.</td>
+          </tr>
+          <tr>
+            <td>Python</td>
+            <td>Python 3.12 x64 from Python.org or <code>winget</code>. The Microsoft Store build is not recommended.</td>
+            <td>Python 3.12 is chosen for stability and reproducibility. Store Python often causes PATH, permission, and virtual environment confusion.</td>
+          </tr>
+          <tr>
+            <td>OpenVINO</td>
+            <td><code>openvino==2026.1.0</code></td>
+            <td>Pinning the version makes the workflow reproducible.</td>
+          </tr>
+          <tr>
+            <td>Model</td>
+            <td><code>OpenVINO/resnet50-int8-ov</code></td>
+            <td>This official Hugging Face model is already in OpenVINO IR format, so you avoid TensorFlow/PyTorch conversion issues.</td>
+          </tr>
+          <tr>
+            <td>Drivers</td>
+            <td>Latest stable Intel Graphics Driver and Intel NPU Driver from Intel or your OEM</td>
+            <td>Whether OpenVINO can see <code>GPU</code> or <code>NPU</code> mainly depends on driver support.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>1. Create a Clean Working Folder</h2>
+      <p>Run the commands below in PowerShell. You can change only the <code>$WorkDir</code> value if you want to use a different folder. Later steps reuse the saved working-folder value, so they will not depend on a hard-coded path.</p>
+      <pre><code>$ErrorActionPreference = "Stop"
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+
+$WorkDir = Join-Path $env:USERPROFILE "Documents\openvino-resnet50-stress"
+New-Item -ItemType Directory -Force -Path $WorkDir | Out-Null
+Set-Location -LiteralPath $WorkDir
+
+$WorkDir = (Get-Location).ProviderPath
+$env:OPENVINO_RESNET50_STRESS_WORKDIR = $WorkDir
+[Environment]::SetEnvironmentVariable("OPENVINO_RESNET50_STRESS_WORKDIR", $WorkDir, "User")
+
+Write-Host "Working directory: $WorkDir"
+Write-Host "Saved as OPENVINO_RESNET50_STRESS_WORKDIR for later steps."</code></pre>
+      <div class="note">
+        If you already cloned this repository and want to use that folder, open PowerShell in the repository folder first, then replace the <code>$WorkDir = ...</code> line with <code>$WorkDir = (Get-Location).ProviderPath</code>.
+      </div>
+    </section>
+
+    <section>
+      <h2>2. Install and Confirm Python 3.12 x64</h2>
+      <p>Python 3.12 is not the newest Python release. This guide pins Python 3.12 x64 because it keeps OpenVINO, pip wheels, venv, and Windows PowerShell behavior more stable and reproducible. If you want to use a newer Python version, confirm OpenVINO and related packages support it first.</p>
+      <p>If Python 3.12 x64 is already installed, run the version check first. Otherwise, install it with <code>winget</code>.</p>
+      <h3>2.1 Install Python 3.12 x64</h3>
+      <pre><code>winget install --id Python.Python.3.12 --source winget --accept-package-agreements --accept-source-agreements</code></pre>
+      <h3>2.2 Close PowerShell, Open It Again, Then Confirm the Version</h3>
+      <pre><code>py -0p
+py -3.12 -c "import platform, sys; print(sys.version); print(platform.architecture())"</code></pre>
+      <div class="check">
+        You should see Python 3.12 and a 64-bit architecture. If <code>py -3.12</code> is not found, restart PowerShell. If it is still missing, restart Windows and try again.
+      </div>
+    </section>
+
+    <section>
+      <h2>3. Create and Activate the Virtual Environment</h2>
+      <p>This step installs all Python packages inside <code>.venv</code>. It reuses the working folder saved in Step 1, so it will still work if you changed the path there.</p>
+      <pre><code>$ErrorActionPreference = "Stop"
+$WorkDir = $env:OPENVINO_RESNET50_STRESS_WORKDIR
+
+if ([string]::IsNullOrWhiteSpace($WorkDir) -or -not (Test-Path -LiteralPath $WorkDir)) {
+  throw "Cannot find OPENVINO_RESNET50_STRESS_WORKDIR. Run Step 1 first, or set this environment variable to your working folder."
+}
+
+Set-Location -LiteralPath $WorkDir
+Write-Host "Working directory: $PWD"
+
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+python -m pip install --upgrade pip setuptools wheel
+python -m pip --version
+python --version</code></pre>
+      <div class="warn">
+        If PowerShell blocks the activation script, run this in the same window first: <code>Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force</code>. Do not change the machine-wide execution policy.
+      </div>
+    </section>
+
+    <section>
+      <h2>4. Install OpenVINO and Confirm the Benchmark Tool</h2>
+      <p>This guide pins the OpenVINO version. Model download is done directly with PowerShell to fetch the <code>.xml</code> and <code>.bin</code> files, which avoids extra Python CLI dependencies.</p>
+      <pre><code>python -m pip install "openvino==2026.1.0"
+
+python -c "import openvino as ov; print('OpenVINO:', ov.__version__)"
+benchmark_app -h | Select-Object -First 20</code></pre>
+      <div class="check">
+        The PyPI OpenVINO package provides the Python version of <code>benchmark_app</code>. If this command is not found, the virtual environment is usually not activated.
+      </div>
+    </section>
+
+    <section>
+      <h2>5. Download the ResNet-50 OpenVINO IR Model</h2>
+      <p>Use the official OpenVINO Hugging Face model <code>OpenVINO/resnet50-int8-ov</code>. It contains <code>resnet50.xml</code> and <code>resnet50.bin</code>.</p>
+      <pre><code>$ModelDir = "$PWD\models\resnet50-int8-ov"
+New-Item -ItemType Directory -Force -Path $ModelDir | Out-Null
+
+$XmlUrl = "https://huggingface.co/OpenVINO/resnet50-int8-ov/resolve/main/resnet50.xml?download=true"
+$BinUrl = "https://huggingface.co/OpenVINO/resnet50-int8-ov/resolve/main/resnet50.bin?download=true"
+
+Invoke-WebRequest -Uri $XmlUrl -OutFile "$ModelDir\resnet50.xml"
+Invoke-WebRequest -Uri $BinUrl -OutFile "$ModelDir\resnet50.bin"
+
+Get-ChildItem $ModelDir
+$ModelXml = Join-Path $ModelDir "resnet50.xml"
+Test-Path $ModelXml</code></pre>
+      <p>If a company network blocks Hugging Face, open the model page in a browser, download <code>resnet50.xml</code> and <code>resnet50.bin</code>, and place both files in the same <code>$ModelDir</code>.</p>
+    </section>
+
+    <section>
+      <h2>6. Confirm OpenVINO Devices</h2>
+      <p>Before stress testing, list the devices OpenVINO can see. Common results include <code>CPU</code>, <code>GPU</code>, and <code>NPU</code>, depending on your hardware and drivers.</p>
+      <pre><code>@'
+import openvino as ov
+
+core = ov.Core()
+print("OpenVINO:", ov.__version__)
+print("Available devices:", core.available_devices)
+for device in core.available_devices:
+    try:
+        name = core.get_property(device, "FULL_DEVICE_NAME")
+    except Exception as exc:
+        name = f"Cannot query name: {exc}"
+    print(f"{device}: {name}")
+'@ | python -</code></pre>
+      <div class="warn">
+        If <code>NPU</code> is not listed, do not blame Python first. Update the Intel NPU Driver and Intel Graphics Driver, restart Windows, and run the check again. Machines without NPU hardware will not list <code>NPU</code>.
+      </div>
+    </section>
+
+    <section>
+      <h2>7. Run a 60-Second Baseline Test First</h2>
+      <p>Start with CPU to confirm the model and OpenVINO installation work. Always run this smoke test before a longer stress test.</p>
+      <pre><code>$ModelXml = "$PWD\models\resnet50-int8-ov\resnet50.xml"
+benchmark_app -m $ModelXml -d CPU -t 60 -api async -hint throughput</code></pre>
+      <p>If GPU is available:</p>
+      <pre><code>benchmark_app -m $ModelXml -d GPU -t 60 -api async -hint throughput</code></pre>
+      <p>If NPU is available:</p>
+      <pre><code>benchmark_app -m $ModelXml -d NPU -t 60 -api async -hint throughput</code></pre>
+      <div class="note">
+        <code>benchmark_app</code> uses generated input data by default and reports latency and throughput. ResNet-50 is an image classification model, but the goal here is inference stress testing, not classification accuracy.
+      </div>
+    </section>
+
+    <section>
+      <h2>8. Stress Test: Long Single-Device Run</h2>
+      <p>This is the most stable stress-test mode. Start with CPU or GPU. Run NPU only when the hardware and driver support are confirmed.</p>
+      <pre><code>$Device = "CPU"     # Change to "GPU" or "NPU" when available
+$Seconds = 600     # 10 minutes; use 3600 for 1 hour
+$LogDir = "$PWD\logs"
+$ModelXml = "$PWD\models\resnet50-int8-ov\resnet50.xml"
+
+New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+
+benchmark_app -m $ModelXml -d $Device -t $Seconds -api async -hint throughput *>&1 |
+  Tee-Object -FilePath "$LogDir\benchmark_${Device}_${Seconds}s.log"</code></pre>
+      <p>During the stress test, keep Task Manager open and watch CPU, GPU, NPU, memory, and temperature. If you have HWiNFO, Intel Arc Control, or an OEM monitoring tool, record power and temperature as well.</p>
+    </section>
+
+    <section>
+      <h2>9. Stress Test: Multiple Parallel Workers</h2>
+      <p>This step starts multiple PowerShell background jobs that run <code>benchmark_app</code> in parallel. Increase CPU/GPU workers gradually. For NPU, start with one worker.</p>
+      <pre><code>$Device = "CPU"     # Change to "GPU"; for NPU, start with 1 worker
+$Workers = 4
+$Seconds = 300
+$Root = "$PWD"
+$ModelXml = "$PWD\models\resnet50-int8-ov\resnet50.xml"
+$LogDir = "$PWD\logs"
+
+New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+Get-Job | Remove-Job -Force
+
+1..$Workers | ForEach-Object {
+  $Index = $_
+  Start-Job -Name "ov-$Device-$Index" -ScriptBlock {
+    param($Root, $ModelXml, $Device, $Seconds, $Index)
+    Set-Location -LiteralPath $Root
+    .\.venv\Scripts\Activate.ps1
+    benchmark_app -m $ModelXml -d $Device -t $Seconds -api async -hint throughput *>&1 |
+      Tee-Object -FilePath ".\logs\benchmark_${Device}_worker${Index}_${Seconds}s.log"
+  } -ArgumentList $Root, $ModelXml, $Device, $Seconds, $Index
+}
+
+Get-Job
+Get-Job | Wait-Job
+Get-Job | Receive-Job
+Get-Job | Remove-Job</code></pre>
+      <div class="warn">
+        If multiple workers make the system unresponsive, lower <code>$Workers</code>. If NPU compilation or execution fails, try <code>$Workers = 1</code> first, then test <code>AUTO:NPU,CPU</code> separately if needed.
+      </div>
+    </section>
+
+    <section>
+      <h2>10. Stable Troubleshooting Order</h2>
+      <ol>
+        <li>Confirm the current PowerShell prompt starts with <code>(.venv)</code>.</li>
+        <li>Confirm <code>python -c "import openvino as ov; print(ov.__version__)"</code> prints <code>2026.1.0</code>.</li>
+        <li>Confirm <code>benchmark_app -h</code> prints help text.</li>
+        <li>Confirm <code>Test-Path .\models\resnet50-int8-ov\resnet50.xml</code> returns <code>True</code>.</li>
+        <li>Confirm <code>core.available_devices</code> includes the device you want to test.</li>
+        <li>If <code>NPU</code> is missing, update the Intel NPU Driver and Intel Graphics Driver, restart Windows, and test again.</li>
+        <li>If only <code>GPU</code> or <code>NPU</code> fails, run <code>CPU</code> first to confirm the model and Python environment are not the problem.</li>
+      </ol>
+      <pre><code># Run the most common self-checks in one pass
+.\.venv\Scripts\Activate.ps1
+python --version
+python -m pip --version
+python -c "import openvino as ov; print(ov.__version__)"
+benchmark_app -h | Select-Object -First 5
+Test-Path ".\models\resnet50-int8-ov\resnet50.xml"
+@'
+import openvino as ov
+core = ov.Core()
+print(core.available_devices)
+'@ | python -</code></pre>
+    </section>
+
+    <section>
+      <h2>11. Recommended Test Matrix</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Phase</th>
+            <th>Device</th>
+            <th>Duration</th>
+            <th>Workers</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Smoke test</td>
+            <td>CPU</td>
+            <td>60 seconds</td>
+            <td>1</td>
+            <td>Confirm OpenVINO, the model, and <code>benchmark_app</code> work.</td>
+          </tr>
+          <tr>
+            <td>Single-device baseline</td>
+            <td>CPU / GPU / NPU</td>
+            <td>300 seconds</td>
+            <td>1</td>
+            <td>Measure baseline throughput and latency for each device.</td>
+          </tr>
+          <tr>
+            <td>Long stability run</td>
+            <td>Target device</td>
+            <td>3600 seconds</td>
+            <td>1</td>
+            <td>Watch temperature, throttling, driver resets, and memory growth.</td>
+          </tr>
+          <tr>
+            <td>Parallel stress</td>
+            <td>CPU / GPU</td>
+            <td>300-1800 seconds</td>
+            <td>2, 4, 8 gradually</td>
+            <td>Measure scheduling, throughput scaling, and system stability.</td>
+          </tr>
+          <tr>
+            <td>Conservative NPU stress</td>
+            <td>NPU</td>
+            <td>300-1800 seconds</td>
+            <td>Start with 1</td>
+            <td>NPU behavior can be more sensitive to model and driver support. Confirm one worker first.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>12. Convert Stress-Test Results to TOPS and Compare with Intel Specifications</h2>
+      <div class="warn">
+        The <code>NPU peak TOPS (INT8)</code> number on Intel or OEM specification pages is a theoretical hardware peak under ideal conditions. <code>benchmark_app</code> measures real model throughput under OpenVINO runtime, driver, graph, memory, scheduling, and device-support limits. Use <code>Effective TOPS / Peak TOPS</code> as a workload utilization estimate. Do not expect measured throughput to equal the vendor peak.
+      </div>
+
+      <h3>12.1 Simple Formula</h3>
+      <p>First, find the throughput value in the <code>benchmark_app</code> log. It is the number of inferences per second, reported as FPS:</p>
+      <pre><code>Throughput: 123.45 FPS</code></pre>
+      <p>Then use these two formulas:</p>
+      <pre><code>Effective TOPS = FPS * Model GOPS per inference / 1000
+Peak utilization (%) = Effective TOPS / Peak TOPS from vendor website * 100</code></pre>
+      <p><code>Peak TOPS</code> comes from the Intel or OEM specification page. <code>Effective TOPS</code> is the measured model throughput from this stress test. The ratio tells you how much of the theoretical peak this workload uses.</p>
+
+      <h3>12.2 For ResNet-50, Use 8.2 GOPS Directly</h3>
+      <p>ResNet-50 is commonly estimated at about <code>4.1 GMAC</code>. For comparison with hardware <code>TOPS</code> specifications, one MAC is usually counted as two operations: multiply plus accumulate. For this guide, use:</p>
+      <pre><code>ResNet-50 Model GOPS per inference = 8.2</code></pre>
+      <table>
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>Recommended GOPS per Inference</th>
+            <th>Use</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ResNet-50</td>
+            <td><code>8.2 GOPS</code></td>
+            <td>Use this to quickly convert <code>benchmark_app</code> FPS into Effective TOPS.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>If you switch to a different model, replace the model GOPS value with a reliable number for that model. If you do not have a reliable number, do not force a TOPS calculation. Compare FPS, latency, power, and stability instead.</p>
+
+      <h3>Manual Example</h3>
+      <p>Assume the ResNet-50 stress-test log reports <code>Throughput: 500 FPS</code>, and the machine's official NPU peak is <code>13 TOPS</code>:</p>
+      <pre><code>Effective TOPS = 500 * 8.2 / 1000 = 4.10 TOPS
+Peak utilization = 4.10 / 13 * 100 = 31.54%</code></pre>
+      <p>If another machine has an official NPU peak of <code>40 TOPS</code>, the same <code>500 FPS</code> result becomes:</p>
+      <pre><code>Peak utilization = 4.10 / 40 * 100 = 10.25%</code></pre>
+
+      <h3>Notes for Interpreting Results</h3>
+      <ul>
+        <li><code>Peak TOPS</code> is the theoretical INT8 NPU peak. It is not a benchmark score every model should reach.</li>
+        <li>Whether ResNet-50 fully runs on NPU, uses fallback, or is limited by memory bandwidth will affect Effective TOPS.</li>
+        <li>If the <code>benchmark_app</code> log shows a device other than <code>NPU</code>, or if you used <code>AUTO:NPU,CPU</code>, do not treat the result as pure NPU TOPS.</li>
+        <li>Batch size, streams, driver version, power mode, and thermal state can all change FPS. Fix test conditions before comparing machines.</li>
+        <li>To get closer to vendor peak numbers, use a workload that closely matches the NPU INT8 execution path. ResNet-50 is a practical stress-test reference, not a hardware-peak microbenchmark.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>13. Models and Workloads Suitable for NPU INT8 Stress Testing</h2>
+      <p>To make results closer to the NPU INT8 execution path, prefer quantized models with static shapes and regular compute patterns. OpenVINO NPU documentation also notes that NPU-supported quantized models can be INT8 or FP16-INT8, and that static shapes are currently the most NPU-friendly.</p>
+      <h3>13.1 Preferred Choices</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Candidate Models</th>
+            <th>Reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Image classification CNN</td>
+            <td><code>resnet-50</code>, <code>mobilenet-v2</code>, <code>mobilenet-v3</code>, <code>efficientnet-b0</code>, <code>googlenet-v4</code></td>
+            <td>Conv-heavy models with static inputs are easier to use for throughput stress testing and TOPS conversion.</td>
+          </tr>
+          <tr>
+            <td>Small object detection / OCR backbone</td>
+            <td><code>ssdlite_mobilenet_v2</code>, <code>pp-ocr-det</code>, <code>pp-ocr-rec</code></td>
+            <td>Practical workloads, but NMS, decode, and post-processing can reduce Effective TOPS.</td>
+          </tr>
+          <tr>
+            <td>Audio / speech small models</td>
+            <td><code>aclnet-int8</code>, DNS, or keyword-spotting models</td>
+            <td>Small and regular inputs make them useful for NPU stability and low-power inference checks.</td>
+          </tr>
+          <tr>
+            <td>NLP encoder</td>
+            <td>BERT-style <code>INT8</code> or <code>FP16-INT8</code> encoders</td>
+            <td>MatMul-heavy workloads test another execution pattern, but TOPS conversion is usually less intuitive than ResNet-50.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>13.2 Model Selection Checklist</h3>
+      <ul>
+        <li>Prefer <code>INT8</code> or <code>FP16-INT8</code> models.</li>
+        <li>Prefer fixed input shapes, for example <code>1x3x224x224</code>.</li>
+        <li>Prefer OpenVINO IR format, meaning the model includes both <code>.xml</code> and <code>.bin</code>.</li>
+        <li>Use <code>-d NPU</code> for dedicated NPU testing. Avoid mixing fallback into the result with <code>AUTO:NPU,CPU</code>.</li>
+        <li>Keep resize, decode, NMS, tokenizer, and post-processing outside TOPS conversion whenever possible.</li>
+      </ul>
+
+      <h3>13.3 Not Recommended for Direct Peak TOPS Comparison</h3>
+      <ul>
+        <li>LLM token generation: bottlenecks are often memory, KV cache, and token loops, not pure INT8 dense compute.</li>
+        <li>Complete YOLO pipelines: NMS, decode, resize, and post-processing reduce Effective TOPS.</li>
+        <li>Dynamic-shape models: NPU execution is more likely to be limited or fail compilation.</li>
+        <li>FP16-only models: these may run on NPU, but they are not suitable for direct comparison with official <code>INT8 TOPS</code>.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>14. References</h2>
+      <ul>
+        <li><a href="https://docs.openvino.ai/install">OpenVINO official installation documentation</a></li>
+        <li><a href="https://docs.openvino.ai/nightly/get-started/learn-openvino/openvino-samples/benchmark-tool.html">OpenVINO Benchmark Tool documentation</a></li>
+        <li><a href="https://docs.openvino.ai/2026/about-openvino/performance-benchmarks/getting-performance-numbers.html">OpenVINO Performance Benchmark documentation</a></li>
+        <li><a href="https://huggingface.co/OpenVINO/resnet50-int8-ov">OpenVINO/resnet50-int8-ov model page</a></li>
+      </ul>
+      <p>Prepared on 2026-05-29. Updated on 2026-06-01. If OpenVINO or Hugging Face behavior changes in the future, prefer the latest official documentation.</p>
+    </section>
+
+    <footer>
+      <p>Recommended logs to keep: <code>logs\benchmark_*.log</code>. When comparing devices, record driver version, OpenVINO version, power mode, thermal state, and test duration.</p>
+    </footer>
+  </main>
+  <script>
+    document.querySelectorAll("pre > code").forEach((codeBlock) => {
+      const pre = codeBlock.parentElement;
+      const button = document.createElement("button");
+      button.className = "copy-code";
+      button.type = "button";
+      button.textContent = "Copy";
+      button.setAttribute("aria-label", "Copy code block");
+
+      button.addEventListener("click", async () => {
+        const text = codeBlock.innerText;
+        try {
+          await navigator.clipboard.writeText(text);
+          button.textContent = "Copied";
+          window.setTimeout(() => {
+            button.textContent = "Copy";
+          }, 1600);
+        } catch (error) {
+          const textArea = document.createElement("textarea");
+          textArea.value = text;
+          textArea.setAttribute("readonly", "");
+          textArea.style.position = "fixed";
+          textArea.style.left = "-9999px";
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand("copy");
+          document.body.removeChild(textArea);
+          button.textContent = "Copied";
+          window.setTimeout(() => {
+            button.textContent = "Copy";
+          }, 1600);
+        }
+      });
+
+      pre.appendChild(button);
+    });
+  </script>
+</body>
+</html>
